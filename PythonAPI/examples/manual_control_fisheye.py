@@ -34,6 +34,7 @@ Use ARROWS or WASD keys for control.
 
     O            : open/close all doors of vehicle
     T            : toggle vehicle's telemetry
+
     V            : Select next map layer (Shift+V reverse)
     B            : Load current selected map layer (Shift+B to unload)
     R            : toggle recording images to disk
@@ -1099,6 +1100,7 @@ class CameraManager(object):
 
         self.transform_index = 1
         self.sensors = [
+            ['sensor.camera.fisheye', cc.Raw, 'Camera Fisheye', {}],
             ['sensor.camera.rgb', cc.Raw, 'Camera RGB', {}],
             ['sensor.camera.depth', cc.Raw, 'Camera Depth (Raw)', {}],
             ['sensor.camera.depth', cc.Depth, 'Camera Depth (Gray Scale)', {}],
@@ -1116,24 +1118,23 @@ class CameraManager(object):
                 'chromatic_aberration_offset': '0'}],
             ['sensor.camera.optical_flow', cc.Raw, 'Optical Flow', {}],
             ['sensor.camera.normals', cc.Raw, 'Camera Normals', {}],
-            ['sensor.camera.fisheye', cc.Raw, 'Camera Fisheye', {}],
         ]
         world = self._parent.get_world()
         bp_library = world.get_blueprint_library()
         for item in self.sensors:
             bp = bp_library.find(item[0])
             if item[0] == 'sensor.camera.fisheye':
-                bp.set_attribute('x_size', str(hud.dim[0]))
-                bp.set_attribute('y_size', str(hud.dim[1]))
-                bp.set_attribute('max_angle', str(210))
+                bp.set_attribute('image_size_x', str(hud.dim[0]))
+                bp.set_attribute('image_size_y', str(hud.dim[1]))
+                bp.set_attribute('fov', str(210))
                 bp.set_attribute('d_1', str(0.08309221636708493))
                 bp.set_attribute('d_2', str(0.01112126630599195))
                 bp.set_attribute('d_3', str(-0.008587261043925865))
                 bp.set_attribute('d_4', str(0.0008542188930970716))
-                bp.set_attribute('f_x', str(320))
-                bp.set_attribute('f_y', str(320))
+                bp.set_attribute('f_x', str(640))
+                bp.set_attribute('f_y', str(640))
                 bp.set_attribute('c_x', str(640))
-                bp.set_attribute('c_y', str(480))
+                bp.set_attribute('c_y', str(360))
             elif item[0].startswith('sensor.camera'):
                 bp.set_attribute('image_size_x', str(hud.dim[0]))
                 bp.set_attribute('image_size_y', str(hud.dim[1]))
@@ -1158,6 +1159,7 @@ class CameraManager(object):
 
     def set_sensor(self, index, notify=True, force_respawn=False):
         index = index % len(self.sensors)
+        print(self.sensors[index][0])
         needs_respawn = True if self.index is None else \
             (force_respawn or (self.sensors[index][2] != self.sensors[self.index][2]))
         if needs_respawn:
@@ -1210,7 +1212,7 @@ class CameraManager(object):
             # Example of converting the raw_data from a carla.DVSEventArray
             # sensor into a NumPy array and using it as an image
             dvs_events = np.frombuffer(image.raw_data, dtype=np.dtype([
-                ('x', np.uint16), ('y', np.uint16), ('t', np.int64), ('pol', np.bool)]))
+                ('x', np.uint16), ('y', np.uint16), ('t', np.int64), ('pol', bool)]))
             dvs_img = np.zeros((image.height, image.width, 3), dtype=np.uint8)
             # Blue is positive, red is negative
             dvs_img[dvs_events[:]['y'], dvs_events[:]['x'], dvs_events[:]['pol'] * 2] = 255
@@ -1219,6 +1221,14 @@ class CameraManager(object):
             image = image.get_color_coded_flow()
             array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
             array = np.reshape(array, (image.height, image.width, 4))
+            array = array[:, :, :3]
+            array = array[:, :, ::-1]
+            self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
+        elif self.sensors[self.index][0].startswith('sensor.camera.fisheye'):
+            # image = image.get_color_coded_flow()
+            image.convert(self.sensors[self.index][1])
+            array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
+            array = np.reshape(array, (720, 1280, 4))
             array = array[:, :, :3]
             array = array[:, :, ::-1]
             self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))

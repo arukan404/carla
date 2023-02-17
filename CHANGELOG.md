@@ -1,3 +1,7 @@
+## Latest
+
+* Added a new sensor - fisheye camera
+
 ## CARLA 0.9.14
 
   * Fixed tutorial for adding a sensor to CARLA.
